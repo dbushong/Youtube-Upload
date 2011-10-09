@@ -50,6 +50,8 @@ import gdata.service
 import gdata.geo
 import gdata.youtube
 import gdata.youtube.service
+from gdata.media import YOUTUBE_NAMESPACE
+from atom import ExtensionElement
 
 # http://pycurl.sourceforge.net/
 try:
@@ -206,7 +208,7 @@ class Youtube:
         return self.service.CheckUploadStatus(video_id=video_id)
            
     def _create_video_entry(self, title, description, category, keywords=None, 
-                            location=None, private=False):
+                            location=None, private=False, unlisted=False):
         if category not in self.categories:
             valid = " ".join(self.categories.keys())
             raise InvalidCategory("Invalid category '%s' (valid: %s)" % (category, valid))
@@ -225,7 +227,11 @@ class Youtube:
             where.set_location(location)
         else: 
             where = None
-        return gdata.youtube.YouTubeVideoEntry(media=media_group, geo=where)
+        if unlisted:    
+            extension = [ExtensionElement('accessControl',namespace=YOUTUBE_NAMESPACE,attributes={'action':'list','permission':'denied'})]
+        else:
+            extension = None
+        return gdata.youtube.YouTubeVideoEntry(media=media_group, geo=where, extension_elements=extension)
                 
     @classmethod
     def get_categories(cls):
@@ -301,6 +307,8 @@ def main_upload(arguments, output=sys.stdout):
         help='Title template to use on multiple videos (default: $title [$n/$total])')
     parser.add_option('', '--private', dest='private',
         action="store_true", default=False, help='Set uploaded video(s) as private')
+    parser.add_option('', '--unlisted', dest='unlisted',
+        action="store_true", default=False, help='Set uploaded video(s) as unlisted')
     parser.add_option('', '--location', dest='location', type="string", default=None,
         metavar="LAT,LON", help='Video(s) location (lat, lon). example: "43.3,5.42"')
     
@@ -383,7 +391,7 @@ def main_upload(arguments, output=sys.stdout):
                           if len(videos) > 1 else options.title)
         args = [video_path, complete_title, options.description, 
                 options.category, options.keywords]
-        kwargs = dict(private=options.private, location=parse_location(options.location))
+        kwargs = dict(private=options.private, location=parse_location(options.location), unlisted=options.unlisted)
         
         if options.get_upload_form_data:
             data = youtube.get_upload_form_data(*args, **kwargs)
